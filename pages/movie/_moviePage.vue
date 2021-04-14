@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div v-if="isLoaded">
     <v-card v-for="movie in allMovieData" :key="movie.id">
       <v-img
         :src="'http://image.tmdb.org/t/p/w500' + movie.poster_path"
@@ -47,35 +47,24 @@
         >
       </v-card-text>
 
-      <div v-if="movie.recommended_movies">
+      <v-card v-if="movie.recommended_movies">
         <v-divider class="mx-4"></v-divider>
 
         <v-card-title> Similar Movies </v-card-title>
-
-        <!-- <v-btn
+        <span
           v-for="recommended in movie.recommended_movies.slice(0, 5)"
           :key="recommended.id"
-          elevation="2"
-          :href="'https://www.themoviedb.org/movie/' + recommended.id"
-          target="_blank"
-        > -->
-
-        <v-btn
-          v-for="recommended in movie.recommended_movies.slice(0, 5)"
-          :key="recommended.id"
-          elevation="2"
-          @click="getAllData(recommended.id)"
         >
-          <v-img
-            :src="'https://image.tmdb.org/t/p/w500' + recommended.poster_path"
-            max-width="25"
-          ></v-img>
-          {{ recommended.original_title }}</v-btn
-        >
-      </div>
+          <v-btn elevation="2" :to="{ path: String(recommended.id) }">
+            <v-img
+              :src="'https://image.tmdb.org/t/p/w500' + recommended.poster_path"
+              max-width="25"
+            ></v-img>
+            {{ recommended.original_title }}</v-btn
+          >
+        </span>
+      </v-card>
       <v-divider class="mx-4"></v-divider>
-
-      <!-- <div>{{ movie }}</div> -->
 
       <v-card v-if="movie.streaming_providers">
         <v-card-title> Streaming availability </v-card-title>
@@ -165,21 +154,24 @@
 const axios = require('axios')
 
 export default {
+  // eslint-disable-next-line require-await
+  async asyncData({ params }) {
+    const movieIdFromParam = [params.moviePage]
+    return { movieIdFromParam }
+  },
   data() {
     return {
       hasData: false,
       hasSimilarMovies: false,
+      isLoaded: false,
       allMovieData: [],
-      movieIds: [13368],
-      // movieIds: [13368, 3083, 11934, 134, 155],
+      movieIds: [],
     }
   },
-  created() {
-    this.movieIds.forEach((movieId) => {
-      this.getMovie(movieId)
-      this.getStreaming(movieId)
-      this.getRecommendedMovies(movieId)
-    })
+  async created() {
+    await this.getMovie(this.movieIdFromParam)
+    await this.getStreaming(this.movieIdFromParam)
+    await this.getRecommendedMovies(this.movieIdFromParam)
   },
   methods: {
     getAllData(id) {
@@ -192,19 +184,14 @@ export default {
     },
     getMovie(id) {
       const vm = this
-      axios
+      return axios
         .get(
           `https://api.themoviedb.org/3/movie/` +
             id +
             `?api_key=3c3685919ba529e9728a4603bd9cb0e9`
         )
         .then(function (response) {
-          const tempObj = response.data
-          vm.tempStreams = vm.getStreaming(id)
-          tempObj.streaming_providers = vm.tempStreams
-          // console.log(tempObj)
           vm.allMovieData.push(response.data)
-          // console.log(vm.allMovieData)
         })
         .catch(function (error) {
           // handle error
@@ -221,7 +208,8 @@ export default {
         )
         .then(function (response) {
           vm.allMovieData.forEach((movie) => {
-            if (movie.id === id) {
+            // eslint-disable-next-line eqeqeq
+            if (movie.id == id) {
               movie.streaming_providers = response.data.results.US
             }
           })
@@ -241,10 +229,12 @@ export default {
         )
         .then(function (response) {
           vm.allMovieData.forEach((movie) => {
-            if (movie.id === id) {
+            // eslint-disable-next-line eqeqeq
+            if (movie.id == id) {
               movie.recommended_movies = response.data.results
             }
           })
+          vm.isLoaded = true
         })
         .catch(function (error) {
           // handle error
